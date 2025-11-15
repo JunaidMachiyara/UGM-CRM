@@ -26,9 +26,11 @@ const PurchaseInvoiceViewModal: React.FC<{ purchaseId: string, onClose: () => vo
     if (purchaseType === 'Original') {
         const p = purchase as OriginalPurchased;
         const totalForeign = p.quantityPurchased * p.rate;
-        // FIX: The conversion rate is consistently stored as (USD per 1 unit of FCY), so multiplication is always correct.
-        totalValue = totalForeign * p.conversionRate;
-
+        if ([Currency.AED, Currency.AustralianDollar].includes(p.currency)) {
+            totalValue = p.conversionRate > 0 ? totalForeign / p.conversionRate : 0;
+        } else {
+            totalValue = totalForeign * p.conversionRate;
+        }
     } else {
         totalValue = (purchase as FinishedGoodsPurchase).totalAmountInDollar;
     }
@@ -143,9 +145,19 @@ const PurchaseInvoiceReport: React.FC = () => {
 
     const calculateTotalValue = (purchase: OriginalPurchased) => {
         const totalForeignAmount = purchase.quantityPurchased * purchase.rate;
-        // The original logic incorrectly divided for some currencies. The conversion rate
-        // is consistently stored as (USD per 1 unit of FCY), so multiplication is always correct.
-        return totalForeignAmount * purchase.conversionRate;
+        let totalValueInDollar;
+        const divisionCurrencies = [Currency.AED, Currency.AustralianDollar];
+
+        if (divisionCurrencies.includes(purchase.currency)) {
+             if (purchase.conversionRate > 0) {
+                totalValueInDollar = totalForeignAmount / purchase.conversionRate;
+            } else {
+                totalValueInDollar = 0; // Avoid division by zero
+            }
+        } else {
+            totalValueInDollar = totalForeignAmount * purchase.conversionRate;
+        }
+        return totalValueInDollar;
     };
 
     const reportData = useMemo(() => {

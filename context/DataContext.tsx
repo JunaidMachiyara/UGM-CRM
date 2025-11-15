@@ -2,24 +2,21 @@ import React, { createContext, useContext, useReducer, ReactNode, useEffect, use
 import { 
     AppState, PackingType, JournalEntry, JournalEntryType,
     InvoiceStatus, Currency, LogisticsEntry, Production,
-    LogisticsStatus, DocumentStatus, PlannerData, UserProfile, Role, Module, Item, Division, Vendor
+    LogisticsStatus, DocumentStatus, PlannerData, UserProfile, Role, Module, Item, Division
 } from '../types.ts';
 
 // --- START: Firebase Setup ---
-// The Firebase API key is intentionally split to avoid being flagged by automated security scanners.
-// This is a client-side key and is generally considered safe to be exposed in frontend code.
-const FB_API_KEY_PART_1 = "AIzaSyATRfTy5XIvuFxxSL";
-const FB_API_KEY_PART_2 = "M4Qx_kKOv4IdNlP0Q";
-
+// New Firebase configuration for the "al-anwar" project copy.
 const firebaseConfig = {
-    apiKey: FB_API_KEY_PART_1 + FB_API_KEY_PART_2,
-    authDomain: "ug-m-a7126.firebaseapp.com",
-    projectId: "ug-m-a7126",
-    storageBucket: "ug-m-a7126.firebasestorage.app",
-    messagingSenderId: "177936238315",
-    appId: "1:177936238315:web:38c9193647bf7fcce9e0ae",
-    measurementId: "G-9DHDY8LN14"
+  apiKey: "AIzaSyA1A6APSSwFb1efnmDH9EQ_d_yAfjUM35o",
+  authDomain: "al-anwar-ed227.firebaseapp.com",
+  projectId: "al-anwar-ed227",
+  storageBucket: "al-anwar-ed227.firebasestorage.app",
+  messagingSenderId: "184843589261",
+  appId: "1:184843589261:web:8b7556955a755938c174c4",
+  measurementId: "G-40X36DFQ3S"
 };
+
 
 let auth: any, db: any;
 try {
@@ -41,7 +38,7 @@ export { auth, db };
 
 
 // --- START: PERMISSIONS SETUP ---
-export const mainModules: Module[] = ['dashboard', 'setup', 'dataEntry', 'accounting', 'reports', 'posting', 'logistics', 'hr', 'admin', 'chat'];
+export const mainModules: Module[] = ['dashboard', 'setup', 'dataEntry', 'accounting', 'reports', 'posting', 'logistics', 'hr', 'admin'];
 
 export const dataEntrySubModules = [
     { key: 'dataEntry/opening', label: 'Original Opening' },
@@ -65,7 +62,7 @@ const reportSubModules = [
     'reports/invoices', 'invoices/sales', 'invoices/purchase',
     'reports/detailed-reports', 'detailed-reports/sales', 'detailed-reports/purchases',
     'reports/production', 'production/original-combination', 'production/daily-production', 'production/rebaling-report', 'production/section-production', 'production/feasibility',
-    'reports/financial', 'financial/balance-sheet', 'financial/profit-loss', 'financial/payment-planner', 'financial/expense-planner',
+    'reports/financial', 'financial/balance-sheet', 'financial/profit-loss', 'financial/payment-planner',
 ];
 
 export const allPermissions = [
@@ -141,21 +138,16 @@ const getInitialState = (): AppState => {
         // Empty setup and transactional data
         customers: [],
         suppliers: [],
-        vendors: [],
-        subSuppliers: [],
         employees: [],
         banks: [],
         cashAccounts: [],
         originalTypes: [],
-        originalProducts: [],
         divisions: [],
         subDivisions: [],
         warehouses: [],
         sections: [],
         categories: [],
         items: [],
-        logos: [],
-        assetTypes: [],
         
         commissionAgents: [],
         freightForwarders: [],
@@ -166,23 +158,12 @@ const getInitialState = (): AppState => {
         loanAccounts: [],
         capitalAccounts: [],
         investmentAccounts: [],
-        expenseAccounts: [
-            { id: 'EXP-012', name: 'Depreciation Expense' },
-        ],
+        expenseAccounts: [],
 
         // CORE SYSTEM ACCOUNTS - Required for automated journal entries.
         // It is strongly recommended not to delete these.
         inventoryAccounts: [
             { id: 'INV-FG-001', name: 'Finished Goods Inventory' },
-        ],
-        packingMaterialInventoryAccounts: [
-            { id: 'INV-PM-001', name: 'Packing Material Inventory' },
-        ],
-        fixedAssetAccounts: [
-            { id: 'FA-001', name: 'Fixed Assets at Cost' },
-        ],
-        accumulatedDepreciationAccounts: [
-            { id: 'AD-001', name: 'Accumulated Depreciation' },
         ],
         receivableAccounts: [
             { id: 'AR-001', name: 'Accounts Receivable' },
@@ -201,16 +182,12 @@ const getInitialState = (): AppState => {
         hrTasks: [],
         hrEnquiries: [],
         vehicles: [],
-        fixedAssets: [],
-        depreciationEntries: [],
         originalOpenings: [],
         originalPurchases: [],
         productions: [],
         salesInvoices: [],
         ongoingOrders: [],
         finishedGoodsPurchases: [],
-        packingMaterialItems: [],
-        packingMaterialPurchases: [],
         logisticsEntries: [],
         favoriteCombinations: [],
         journalEntries: [],
@@ -220,7 +197,6 @@ const getInitialState = (): AppState => {
         nextInvoiceNumber: 1,
         nextOngoingOrderNumber: 1,
         nextFinishedGoodsPurchaseNumber: 1,
-        nextPackingMaterialPurchaseNumber: 1,
         nextLogisticsSNo: 1,
         nextHRTaskId: 1,
         nextHREnquiryId: 1,
@@ -234,16 +210,13 @@ const getInitialState = (): AppState => {
         plannerData: {},
         plannerLastWeeklyReset: '',
         plannerLastMonthlyReset: '',
-        plannerCustomerIds: [],
-        plannerSupplierIds: [],
-        plannerExpenseAccountIds: [],
     };
     return baseState;
 };
 
 const initialState = processState(getInitialState());
 
-type EntityName = keyof Omit<AppState, 'nextInvoiceNumber' | 'nextOngoingOrderNumber' | 'nextFinishedGoodsPurchaseNumber' | 'nextReceiptVoucherNumber' | 'nextPaymentVoucherNumber' | 'nextExpenseVoucherNumber' | 'nextJournalVoucherNumber' | 'nextLogisticsSNo' | 'favoriteCombinations' | 'nextHRTaskId' | 'nextHREnquiryId' | 'plannerData' | 'plannerLastWeeklyReset' | 'plannerLastMonthlyReset' | 'nextTestEntryNumber' | 'plannerCustomerIds' | 'plannerSupplierIds' | 'plannerExpenseAccountIds' | 'nextPackingMaterialPurchaseNumber'>;
+type EntityName = keyof Omit<AppState, 'nextInvoiceNumber' | 'nextOngoingOrderNumber' | 'nextFinishedGoodsPurchaseNumber' | 'nextReceiptVoucherNumber' | 'nextPaymentVoucherNumber' | 'nextExpenseVoucherNumber' | 'nextJournalVoucherNumber' | 'nextLogisticsSNo' | 'favoriteCombinations' | 'nextHRTaskId' | 'nextHREnquiryId' | 'plannerData' | 'plannerLastWeeklyReset' | 'plannerLastMonthlyReset' | 'nextTestEntryNumber'>;
 type Entity = AppState[EntityName][0];
 
 type AddAction = { type: 'ADD_ENTITY'; payload: { entity: EntityName; data: Entity }; };
@@ -252,73 +225,15 @@ type DeleteAction = { type: 'DELETE_ENTITY'; payload: { entity: EntityName; id: 
 type RestoreAction = { type: 'RESTORE_STATE'; payload: AppState; };
 type ToggleFavoriteAction = { type: 'TOGGLE_FAVORITE_COMBINATION'; payload: { date: string }; };
 type SetPlannerDataAction = { type: 'SET_PLANNER_DATA'; payload: Partial<{ plannerData: PlannerData; plannerLastWeeklyReset: string; plannerLastMonthlyReset: string; }>; };
-type AddPlannerEntityAction = { type: 'ADD_PLANNER_ENTITY'; payload: { entityType: 'customer' | 'supplier' | 'expenseAccount'; entityId: string }; };
-type RemovePlannerEntityAction = { type: 'REMOVE_PLANNER_ENTITY'; payload: { entityType: 'customer' | 'supplier' | 'expenseAccount'; entityId: string }; };
-
 
 type BatchActionPayload = AddAction | UpdateAction | DeleteAction;
 type BatchUpdateAction = { type: 'BATCH_UPDATE'; payload: BatchActionPayload[] };
-type HardResetTransactionsAction = { type: 'HARD_RESET_TRANSACTIONS' };
 
 
-type Action = AddAction | UpdateAction | DeleteAction | RestoreAction | ToggleFavoriteAction | SetPlannerDataAction | BatchUpdateAction | HardResetTransactionsAction | AddPlannerEntityAction | RemovePlannerEntityAction;
+type Action = AddAction | UpdateAction | DeleteAction | RestoreAction | ToggleFavoriteAction | SetPlannerDataAction | BatchUpdateAction;
 
 const dataReducer = (state: AppState, action: Action): AppState => {
     switch (action.type) {
-        case 'ADD_PLANNER_ENTITY': {
-            const { entityType, entityId } = action.payload;
-            const key: 'plannerCustomerIds' | 'plannerSupplierIds' | 'plannerExpenseAccountIds' = entityType === 'customer' ? 'plannerCustomerIds' : entityType === 'supplier' ? 'plannerSupplierIds' : 'plannerExpenseAccountIds';
-            const currentIds = state[key] || [];
-            if (currentIds.includes(entityId)) return state;
-            return { ...state, [key]: [...currentIds, entityId] };
-        }
-        case 'REMOVE_PLANNER_ENTITY': {
-            const { entityType, entityId } = action.payload;
-            const key: 'plannerCustomerIds' | 'plannerSupplierIds' | 'plannerExpenseAccountIds' = entityType === 'customer' ? 'plannerCustomerIds' : entityType === 'supplier' ? 'plannerSupplierIds' : 'plannerExpenseAccountIds';
-            const currentIds = state[key] || [];
-            return { ...state, [key]: currentIds.filter(id => id !== entityId) };
-        }
-        case 'HARD_RESET_TRANSACTIONS': {
-            return {
-                ...state,
-                // Transactional Data - clear them
-                salesInvoices: [],
-                originalPurchases: [],
-                finishedGoodsPurchases: [],
-                packingMaterialPurchases: [],
-                journalEntries: [],
-                productions: [],
-                originalOpenings: [],
-                ongoingOrders: [],
-                logisticsEntries: [],
-                attendanceRecords: [],
-                salaryPayments: [],
-                hrTasks: [],
-                hrEnquiries: [],
-                favoriteCombinations: [],
-                testEntries: [],
-                depreciationEntries: [],
-                
-                // Counters - reset them
-                nextInvoiceNumber: 1,
-                nextOngoingOrderNumber: 1,
-                nextFinishedGoodsPurchaseNumber: 1,
-                nextPackingMaterialPurchaseNumber: 1,
-                nextLogisticsSNo: 1,
-                nextReceiptVoucherNumber: 1,
-                nextPaymentVoucherNumber: 1,
-                nextExpenseVoucherNumber: 1,
-                nextJournalVoucherNumber: 1,
-                nextTestEntryNumber: 1,
-                nextHRTaskId: 1,
-                nextHREnquiryId: 1,
-        
-                // Planner Data - reset
-                plannerData: {},
-                plannerLastWeeklyReset: '',
-                plannerLastMonthlyReset: '',
-            };
-        }
         case 'BATCH_UPDATE':
             return action.payload.reduce(
                 (currentState, currentAction) => dataReducer(currentState, currentAction),
@@ -331,7 +246,6 @@ const dataReducer = (state: AppState, action: Action): AppState => {
             if (entity === 'salesInvoices') newState.nextInvoiceNumber = state.nextInvoiceNumber + 1;
             if (entity === 'ongoingOrders') newState.nextOngoingOrderNumber = state.nextOngoingOrderNumber + 1;
             if (entity === 'finishedGoodsPurchases') newState.nextFinishedGoodsPurchaseNumber = state.nextFinishedGoodsPurchaseNumber + 1;
-            if (entity === 'packingMaterialPurchases') newState.nextPackingMaterialPurchaseNumber = state.nextPackingMaterialPurchaseNumber + 1;
             if (entity === 'logisticsEntries') newState.nextLogisticsSNo = state.nextLogisticsSNo + 1;
             if (entity === 'hrTasks') newState.nextHRTaskId = state.nextHRTaskId + 1;
             if (entity === 'hrEnquiries') newState.nextHREnquiryId = state.nextHREnquiryId + 1;
@@ -378,19 +292,14 @@ const dataReducer = (state: AppState, action: Action): AppState => {
                 const newState: AppState = {
                     customers: firestoreState.customers || defaultState.customers,
                     suppliers: firestoreState.suppliers || defaultState.suppliers,
-                    vendors: firestoreState.vendors || defaultState.vendors,
-                    subSuppliers: firestoreState.subSuppliers || defaultState.subSuppliers,
                     commissionAgents: firestoreState.commissionAgents || defaultState.commissionAgents,
                     items: firestoreState.items || defaultState.items,
                     originalTypes: firestoreState.originalTypes || defaultState.originalTypes,
-                    originalProducts: firestoreState.originalProducts || defaultState.originalProducts,
                     divisions: firestoreState.divisions || defaultState.divisions,
                     subDivisions: firestoreState.subDivisions || defaultState.subDivisions,
                     warehouses: firestoreState.warehouses || defaultState.warehouses,
                     sections: firestoreState.sections || defaultState.sections,
                     categories: firestoreState.categories || defaultState.categories,
-                    logos: firestoreState.logos || defaultState.logos,
-                    assetTypes: firestoreState.assetTypes || defaultState.assetTypes,
                     freightForwarders: firestoreState.freightForwarders || defaultState.freightForwarders,
                     clearingAgents: firestoreState.clearingAgents || defaultState.clearingAgents,
                     banks: firestoreState.banks || defaultState.banks,
@@ -400,9 +309,6 @@ const dataReducer = (state: AppState, action: Action): AppState => {
                     investmentAccounts: firestoreState.investmentAccounts || defaultState.investmentAccounts,
                     expenseAccounts: firestoreState.expenseAccounts || defaultState.expenseAccounts,
                     inventoryAccounts: firestoreState.inventoryAccounts || defaultState.inventoryAccounts,
-                    packingMaterialInventoryAccounts: firestoreState.packingMaterialInventoryAccounts || defaultState.packingMaterialInventoryAccounts,
-                    fixedAssetAccounts: firestoreState.fixedAssetAccounts || defaultState.fixedAssetAccounts,
-                    accumulatedDepreciationAccounts: firestoreState.accumulatedDepreciationAccounts || defaultState.accumulatedDepreciationAccounts,
                     receivableAccounts: firestoreState.receivableAccounts || defaultState.receivableAccounts,
                     revenueAccounts: firestoreState.revenueAccounts || defaultState.revenueAccounts,
                     payableAccounts: firestoreState.payableAccounts || defaultState.payableAccounts,
@@ -412,16 +318,12 @@ const dataReducer = (state: AppState, action: Action): AppState => {
                     hrTasks: firestoreState.hrTasks || defaultState.hrTasks,
                     hrEnquiries: firestoreState.hrEnquiries || defaultState.hrEnquiries,
                     vehicles: firestoreState.vehicles || defaultState.vehicles,
-                    fixedAssets: firestoreState.fixedAssets || defaultState.fixedAssets,
-                    depreciationEntries: firestoreState.depreciationEntries || defaultState.depreciationEntries,
                     originalOpenings: firestoreState.originalOpenings || defaultState.originalOpenings,
                     originalPurchases: firestoreState.originalPurchases || defaultState.originalPurchases,
                     productions: firestoreState.productions || defaultState.productions,
                     salesInvoices: firestoreState.salesInvoices || defaultState.salesInvoices,
                     ongoingOrders: firestoreState.ongoingOrders || defaultState.ongoingOrders,
                     finishedGoodsPurchases: firestoreState.finishedGoodsPurchases || defaultState.finishedGoodsPurchases,
-                    packingMaterialItems: firestoreState.packingMaterialItems || defaultState.packingMaterialItems,
-                    packingMaterialPurchases: firestoreState.packingMaterialPurchases || defaultState.packingMaterialPurchases,
                     logisticsEntries: firestoreState.logisticsEntries || defaultState.logisticsEntries,
                     favoriteCombinations: firestoreState.favoriteCombinations || defaultState.favoriteCombinations,
                     journalEntries: firestoreState.journalEntries || defaultState.journalEntries,
@@ -430,7 +332,6 @@ const dataReducer = (state: AppState, action: Action): AppState => {
                     nextInvoiceNumber: firestoreState.nextInvoiceNumber ?? defaultState.nextInvoiceNumber,
                     nextOngoingOrderNumber: firestoreState.nextOngoingOrderNumber ?? defaultState.nextOngoingOrderNumber,
                     nextFinishedGoodsPurchaseNumber: firestoreState.nextFinishedGoodsPurchaseNumber ?? defaultState.nextFinishedGoodsPurchaseNumber,
-                    nextPackingMaterialPurchaseNumber: firestoreState.nextPackingMaterialPurchaseNumber ?? defaultState.nextPackingMaterialPurchaseNumber,
                     nextLogisticsSNo: firestoreState.nextLogisticsSNo ?? defaultState.nextLogisticsSNo,
                     nextHRTaskId: firestoreState.nextHRTaskId ?? defaultState.nextHRTaskId,
                     nextHREnquiryId: firestoreState.nextHREnquiryId ?? defaultState.nextHREnquiryId,
@@ -443,9 +344,6 @@ const dataReducer = (state: AppState, action: Action): AppState => {
                     plannerData: firestoreState.plannerData || defaultState.plannerData,
                     plannerLastWeeklyReset: firestoreState.plannerLastWeeklyReset || defaultState.plannerLastWeeklyReset,
                     plannerLastMonthlyReset: firestoreState.plannerLastMonthlyReset || defaultState.plannerLastMonthlyReset,
-                    plannerCustomerIds: firestoreState.plannerCustomerIds || defaultState.plannerCustomerIds,
-                    plannerSupplierIds: firestoreState.plannerSupplierIds || defaultState.plannerSupplierIds,
-                    plannerExpenseAccountIds: firestoreState.plannerExpenseAccountIds || defaultState.plannerExpenseAccountIds,
                 };
                 
                 return processState(newState);
@@ -468,7 +366,7 @@ interface DataContextProps {
 
 const DataContext = createContext<DataContextProps | undefined>(undefined);
 
-const FIRESTORE_DOC_PATH = 'appState/mainState-v11';
+const FIRESTORE_DOC_PATH = 'appState/mainState-v1-alanwar';
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [state, dispatch] = useReducer(dataReducer, initialState);

@@ -8,7 +8,6 @@ import { generateFinishedGoodsPurchaseId } from '../utils/idGenerator.ts';
 import ItemSelector from './ui/ItemSelector.tsx';
 import CurrencyInput from './ui/CurrencyInput.tsx';
 import Modal from './ui/Modal.tsx';
-import EntitySelector from './ui/EntitySelector.tsx';
 
 // --- Reusable Helper Components ---
 const CollapsibleSection: React.FC<{ title: string; children: React.ReactNode; defaultOpen?: boolean }> = ({ title, children, defaultOpen = false }) => {
@@ -82,8 +81,6 @@ const OriginalPurchaseFormInternal: React.FC<Omit<PurchasesModuleProps, 'selecte
             freightForwarderId: '', freightAmount: undefined,
             clearingAgentId: '', clearingAmount: undefined, 
             commissionAgentId: '', commissionAmount: undefined,
-            subSupplierId: '',
-            originalProductId: '',
         };
     };
 
@@ -95,34 +92,20 @@ const OriginalPurchaseFormInternal: React.FC<Omit<PurchasesModuleProps, 'selecte
     const [purchaseToSave, setPurchaseToSave] = useState<OriginalPurchased | null>(null);
     const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
     const [hasPrinted, setHasPrinted] = useState(false);
+    const [containerError, setContainerError] = useState<string | null>(null);
 
     const availableSubDivisions = useMemo(() => {
         if (!formData.divisionId) return [];
         return state.subDivisions.filter(sd => sd.divisionId === formData.divisionId);
     }, [formData.divisionId, state.subDivisions]);
 
-    const availableSubSuppliers = useMemo(() => {
-        if (!formData.supplierId) return [];
-        return state.subSuppliers.filter(ss => ss.supplierId === formData.supplierId);
-    }, [formData.supplierId, state.subSuppliers]);
-
-    const availableOriginalProducts = useMemo(() => {
-        if (!formData.originalTypeId) return [];
-        return state.originalProducts.filter(op => op.originalTypeId === formData.originalTypeId);
-    }, [formData.originalTypeId, state.originalProducts]);
-
     useEffect(() => {
         const supplier = state.suppliers.find(s => s.id === formData.supplierId);
         setFormData(prev => ({
             ...prev,
             currency: supplier?.defaultCurrency || Currency.Dollar,
-            subSupplierId: '',
         }));
     }, [formData.supplierId, state.suppliers]);
-    
-    useEffect(() => {
-        setFormData(prev => ({ ...prev, originalProductId: '' }));
-    }, [formData.originalTypeId]);
 
     // Effects to clear amounts when default agents are selected
     useEffect(() => {
@@ -155,6 +138,17 @@ const OriginalPurchaseFormInternal: React.FC<Omit<PurchasesModuleProps, 'selecte
     
     const handlePrepareSummary = (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (formData.containerNumber && formData.containerNumber.trim() !== '') {
+            const trimmedContainerNumber = formData.containerNumber.trim().toLowerCase();
+            const isDuplicateInOriginals = state.originalPurchases.some(p => p.containerNumber && p.containerNumber.trim().toLowerCase() === trimmedContainerNumber);
+            const isDuplicateInFinished = state.finishedGoodsPurchases.some(p => p.containerNumber && p.containerNumber.trim().toLowerCase() === trimmedContainerNumber);
+
+            if (isDuplicateInOriginals || isDuplicateInFinished) {
+                setContainerError(`DUPLICATE CONTAINER: The container number "${formData.containerNumber}" is already in use. Please enter a different one.`);
+                return;
+            }
+        }
 
         const fullPurchaseData: OriginalPurchased = {
             id: `pur_orig_${Date.now()}`,
@@ -204,15 +198,9 @@ const OriginalPurchaseFormInternal: React.FC<Omit<PurchasesModuleProps, 'selecte
         const jeDate = purchaseToSave.date;
         const baseDescription = `Purchase from ${state.suppliers.find(s => s.id === purchaseToSave.supplierId)?.name}`;
         
-        const itemValueFC = purchaseToSave.quantityPurchased * purchaseToSave.rate;
-        const itemValueUSD = (itemValueFC * (purchaseToSave.conversionRate || 1)) + (purchaseToSave.discountSurcharge || 0);
-
+        const itemValueUSD = (purchaseToSave.quantityPurchased * purchaseToSave.rate * (purchaseToSave.conversionRate || 1)) + (purchaseToSave.discountSurcharge || 0);
         const purchaseDebit: JournalEntry = { id: `je-d-${purchaseToSave.id}`, voucherId: `JV-${purchaseToSave.id}`, date: jeDate, entryType: JournalEntryType.Journal, account: 'EXP-004', debit: itemValueUSD, credit: 0, description: baseDescription };
-        const supplierCredit: JournalEntry = { 
-            id: `je-c-${purchaseToSave.id}`, voucherId: `JV-${purchaseToSave.id}`, date: jeDate, entryType: JournalEntryType.Journal, account: 'AP-001', 
-            debit: 0, credit: itemValueUSD, description: baseDescription, entityId: purchaseToSave.supplierId, entityType: 'supplier',
-            originalAmount: purchaseToSave.currency !== Currency.Dollar ? { amount: itemValueFC, currency: purchaseToSave.currency } : undefined,
-        };
+        const supplierCredit: JournalEntry = { id: `je-c-${purchaseToSave.id}`, voucherId: `JV-${purchaseToSave.id}`, date: jeDate, entryType: JournalEntryType.Journal, account: 'AP-001', debit: 0, credit: itemValueUSD, description: baseDescription, entityId: purchaseToSave.supplierId, entityType: 'supplier' };
         dispatch({ type: 'ADD_ENTITY', payload: { entity: 'journalEntries', data: purchaseDebit }});
         dispatch({ type: 'ADD_ENTITY', payload: { entity: 'journalEntries', data: supplierCredit }});
 
@@ -227,11 +215,7 @@ const OriginalPurchaseFormInternal: React.FC<Omit<PurchasesModuleProps, 'selecte
                 const costValueUSD = (cost.amount || 0) * cost.currencyData.conversionRate;
                 const costDesc = `${cost.type} for INV ${purchaseToSave.id} from ${cost.name}`;
                 const debit: JournalEntry = { id: `je-d-${cost.type.toLowerCase()}-${purchaseToSave.id}`, voucherId: `JV-${purchaseToSave.id}`, date: jeDate, entryType: JournalEntryType.Journal, account: cost.account, debit: costValueUSD, credit: 0, description: costDesc };
-                const credit: JournalEntry = { 
-                    id: `je-c-${cost.type.toLowerCase()}-${purchaseToSave.id}`, voucherId: `JV-${purchaseToSave.id}`, date: jeDate, entryType: JournalEntryType.Journal, 
-                    account: 'AP-001', debit: 0, credit: costValueUSD, description: costDesc, entityId: cost.id, entityType: cost.entityType,
-                    originalAmount: cost.currencyData.currency !== Currency.Dollar ? { amount: cost.amount || 0, currency: cost.currencyData.currency } : undefined
-                };
+                const credit: JournalEntry = { id: `je-c-${cost.type.toLowerCase()}-${purchaseToSave.id}`, voucherId: `JV-${purchaseToSave.id}`, date: jeDate, entryType: JournalEntryType.Journal, account: 'AP-001', debit: 0, credit: costValueUSD, description: costDesc, entityId: cost.id, entityType: cost.entityType };
                 dispatch({ type: 'ADD_ENTITY', payload: { entity: 'journalEntries', data: debit }});
                 dispatch({ type: 'ADD_ENTITY', payload: { entity: 'journalEntries', data: credit }});
             }
@@ -255,33 +239,17 @@ const OriginalPurchaseFormInternal: React.FC<Omit<PurchasesModuleProps, 'selecte
             <form onSubmit={handlePrepareSummary} className="space-y-6">
                 <div className="border rounded-lg p-4 bg-white">
                     <h3 className="text-lg font-semibold text-slate-800 mb-4 border-b pb-2">Core Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div><label className="block text-sm font-medium text-slate-700">Date</label><input type="date" name="date" value={formData.date} onChange={handleChange} required className={`${inputClasses}`}/></div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700">Supplier</label>
-                            <EntitySelector
-                                entities={state.suppliers}
-                                selectedEntityId={formData.supplierId || ''}
-                                onSelect={(id) => handleChange({ target: { name: 'supplierId', value: id } } as any)}
-                                placeholder="Search Suppliers..."
-                            />
-                        </div>
-                         <div>
-                            <label className="block text-sm font-medium text-slate-700">Sub-Supplier</label>
-                            <select name="subSupplierId" value={formData.subSupplierId} onChange={handleChange} disabled={!formData.supplierId || availableSubSuppliers.length === 0} className={`${inputClasses}`}>
-                                <option value="">Select Sub-Supplier (Optional)</option>
-                                {availableSubSuppliers.map(ss => <option key={ss.id} value={ss.id}>{ss.name}</option>)}
+                            <select name="supplierId" value={formData.supplierId} onChange={handleChange} required className={`${inputClasses}`}>
+                                <option value="">Select Supplier</option>
+                                {state.suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                             </select>
                         </div>
-                        <div><label className="block text-sm font-medium text-slate-700">Batch Number</label><input type="text" name="batchNumber" value={formData.batchNumber} onChange={handleChange} disabled className={`${inputClasses} bg-slate-200`}/></div>
+                        <div><label className="block text-sm font-medium text-slate-700">Batch Number</label><input type="text" name="batchNumber" value={formData.batchNumber} onChange={handleChange} className={`${inputClasses}`}/></div>
                         <div><label className="block text-sm font-medium text-slate-700">Original Type</label><select name="originalTypeId" value={formData.originalTypeId} onChange={handleChange} required className={`${inputClasses}`}><option value="">Select Type</option>{state.originalTypes.map(ot => <option key={ot.id} value={ot.id}>{ot.name}</option>)}</select></div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700">Original Product</label>
-                            <select name="originalProductId" value={formData.originalProductId} onChange={handleChange} disabled={!formData.originalTypeId || availableOriginalProducts.length === 0} className={`${inputClasses}`}>
-                                <option value="">Select Product (Optional)</option>
-                                {availableOriginalProducts.map(op => <option key={op.id} value={op.id}>{op.name}</option>)}
-                            </select>
-                        </div>
                     </div>
                 </div>
 
@@ -339,6 +307,18 @@ const OriginalPurchaseFormInternal: React.FC<Omit<PurchasesModuleProps, 'selecte
 
                 <div className="flex justify-end"><button type="submit" disabled={!formData.supplierId} className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-300">Finalize Purchase</button></div>
             </form>
+
+            {containerError && (
+                <Modal isOpen={!!containerError} onClose={() => setContainerError(null)} title="Validation Error">
+                    <div className="text-slate-700">
+                        <p className="font-semibold text-red-600">Duplicate Container Number</p>
+                        <p className="mt-2">{containerError}</p>
+                        <div className="flex justify-end mt-6">
+                            <button onClick={() => setContainerError(null)} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">OK</button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
 
             {purchaseToSave && (
                 <PurchaseSummaryModal 
@@ -415,9 +395,7 @@ const PurchaseSummaryModal: React.FC<PurchaseSummaryModalProps> = ({ isOpen, onC
 const PrintablePurchaseVoucher: React.FC<{ purchase: OriginalPurchased, state: AppState }> = ({ purchase, state }) => {
     const { supplierId, originalTypeId, date, rate, quantityPurchased, currency, conversionRate, discountSurcharge } = purchase;
     const supplier = state.suppliers.find(s => s.id === supplierId);
-    const subSupplier = state.subSuppliers.find(ss => ss.id === purchase.subSupplierId);
     const originalType = state.originalTypes.find(ot => ot.id === originalTypeId);
-    const originalProduct = state.originalProducts.find(op => op.id === purchase.originalProductId);
     
     const itemValueFC = quantityPurchased * rate;
     const itemValueUSD = itemValueFC * (conversionRate || 1) + (discountSurcharge || 0);
@@ -439,7 +417,7 @@ const PrintablePurchaseVoucher: React.FC<{ purchase: OriginalPurchased, state: A
             <h2 className="text-xl font-bold text-center text-slate-900">Purchase Voucher</h2>
             <div className="grid grid-cols-2 gap-x-8 gap-y-1 mt-4 border-b pb-2 text-slate-700">
                 <p><strong>Date:</strong> {date}</p>
-                <p><strong>Supplier:</strong> {supplier?.name} {subSupplier ? `(${subSupplier.name})` : ''}</p>
+                <p><strong>Supplier:</strong> {supplier?.name}</p>
                 <p><strong>Batch No:</strong> {purchase.batchNumber}</p>
                 <p><strong>Container No:</strong> {purchase.containerNumber || 'N/A'}</p>
             </div>
@@ -454,7 +432,7 @@ const PrintablePurchaseVoucher: React.FC<{ purchase: OriginalPurchased, state: A
                 </thead>
                 <tbody>
                     <tr>
-                        <td className="p-1 text-slate-800">{originalType?.name} {originalProduct ? `- ${originalProduct.name}` : ''}</td>
+                        <td className="p-1 text-slate-800">{originalType?.name}</td>
                         <td className="p-1 text-slate-800 text-right">{quantityPurchased.toLocaleString()}</td>
                         <td className="p-1 text-slate-800 text-right">{rate.toFixed(2)}</td>
                         <td className="p-1 text-slate-800 text-right">{itemValueFC.toFixed(2)}</td>

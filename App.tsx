@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo, useReducer } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import SetupModule, { HRModule } from './components/SetupModule.tsx';
 import DataEntryModule from './components/DataEntryModule.tsx';
 import Dashboard from './components/Dashboard.tsx';
@@ -8,161 +8,11 @@ import ReportsModule from './components/ReportsModule.tsx';
 import PostingModule from './components/PostingModule.tsx';
 import LogisticsModule from './components/LogisticsModule.tsx';
 import AdminModule from './components/AdminModule.tsx';
-import { useData, auth, db, allPermissions } from './context/DataContext.tsx';
+import { useData, auth } from './context/DataContext.tsx';
 import { Module, UserProfile } from './types.ts';
-// FIX: Correct the import casing for the Chatbot component to resolve case-sensitivity issues.
-import Chatbot from './components/chatbot.tsx';
+import Chatbot from './components/Chatbot.tsx';
 import Modal from './components/ui/Modal.tsx';
 import TestPage from './components/TestPage.tsx';
-import ChatModule from './components/ChatModule.tsx';
-
-// --- START: Unread Message Hooks ---
-function useUnreadMessages(userProfile: UserProfile | null) {
-    const [unreadSenderNames, setUnreadSenderNames] = useState<string[]>([]);
-
-    useEffect(() => {
-        if (!userProfile || !db) {
-            setUnreadSenderNames([]);
-            return;
-        }
-
-        const checkForUnread = async () => {
-            if (!userProfile) return;
-            const allUnreadSenders = new Map<string, string>();
-
-            // 1. Check user-to-user chats
-            const chatsQuery = db.collection('chats').where('participants', 'array-contains', userProfile.uid);
-            const chatsSnapshot = await chatsQuery.get();
-
-            const messageChecks = chatsSnapshot.docs.map(async (chatDoc: any) => {
-                const chatData = chatDoc.data();
-                const otherParticipantId = chatData.participants.find((p: string) => p !== userProfile.uid);
-                
-                if (!otherParticipantId) return;
-
-                // Get the last message sent by the other person.
-                const messagesSnapshot = await chatDoc.ref.collection('messages')
-                    .where('senderId', '==', otherParticipantId)
-                    .orderBy('timestamp', 'desc')
-                    .limit(1)
-                    .get();
-                
-                if (!messagesSnapshot.empty) {
-                    const lastMessage = messagesSnapshot.docs[0].data();
-                    if (lastMessage && lastMessage.readBy && !lastMessage.readBy.includes(userProfile.uid)) {
-                        if (!allUnreadSenders.has(lastMessage.senderId)) {
-                            allUnreadSenders.set(lastMessage.senderId, lastMessage.senderName);
-                        }
-                    }
-                }
-            });
-
-            // 2. Check meeting room
-            const meetingRoomQuery = db.collection('meetingRoomMessages')
-                .orderBy('timestamp', 'desc')
-                .limit(1)
-                .get();
-
-            messageChecks.push(meetingRoomQuery.then((snapshot: any) => {
-                if (!snapshot.empty) {
-                    const lastMessage = snapshot.docs[0].data();
-                    if (lastMessage && lastMessage.readBy && lastMessage.senderId !== userProfile.uid && !lastMessage.readBy.includes(userProfile.uid)) {
-                        allUnreadSenders.set('meeting_room', 'Meeting Room');
-                    }
-                }
-            }));
-            
-            await Promise.all(messageChecks);
-            setUnreadSenderNames(Array.from(allUnreadSenders.values()));
-        };
-
-        checkForUnread();
-    }, [userProfile]);
-
-    return unreadSenderNames;
-}
-
-function useUnreadMessageCount(userProfile: UserProfile | null) {
-    const [unreadCount, setUnreadCount] = useState(0);
-    const [users, setUsers] = useState<UserProfile[]>([]);
-
-    useEffect(() => {
-        if (!db || !userProfile) return;
-        const unsub = db.collection('users').onSnapshot((snapshot: any) => {
-            const userList: UserProfile[] = [];
-            snapshot.forEach((doc: any) => {
-                if (doc.id !== userProfile.uid) {
-                    userList.push({ ...doc.data(), uid: doc.id });
-                }
-            });
-            setUsers(userList);
-        });
-        return () => unsub();
-    }, [userProfile]);
-
-    useEffect(() => {
-        if (!userProfile || users.length === 0) {
-            setUnreadCount(0);
-            return;
-        }
-
-        const unreadSources = new Set<string>();
-        const updateCount = () => setUnreadCount(unreadSources.size);
-
-        // Listeners for individual user chats
-        const userListeners = users.map(user => {
-            const ids = [userProfile.uid, user.uid].sort();
-            const chatId = ids.join('_');
-            
-            // CORRECTED QUERY: Remove the invalid 'not-array-contains'
-            const query = db.collection('chats').doc(chatId).collection('messages')
-                .where('senderId', '==', user.uid);
-            
-            return query.onSnapshot((snapshot: any) => {
-                // CORRECTED LOGIC: Filter on the client
-                const hasUnread = snapshot.docs.some((doc: any) => 
-                    !doc.data().readBy.includes(userProfile.uid)
-                );
-
-                if (hasUnread) {
-                    unreadSources.add(user.uid);
-                } else {
-                    unreadSources.delete(user.uid);
-                }
-                updateCount();
-            });
-        });
-
-        // Listener for the meeting room
-        // CORRECTED QUERY: Remove invalid 'not-array-contains'. Fetch recent and filter.
-        const meetingRoomQuery = db.collection('meetingRoomMessages').orderBy('timestamp', 'desc').limit(50); // limit to recent messages for performance
-
-        const meetingRoomListener = meetingRoomQuery.onSnapshot((snapshot: any) => {
-            // CORRECTED LOGIC: Filter on the client
-            const hasUnreadFromOthers = snapshot.docs.some((doc: any) => {
-                const data = doc.data();
-                return data.senderId !== userProfile.uid && !data.readBy.includes(userProfile.uid);
-            });
-            
-            if (hasUnreadFromOthers) {
-                unreadSources.add('meeting_room');
-            } else {
-                unreadSources.delete('meeting_room');
-            }
-            updateCount();
-        });
-        
-        const allListeners = [...userListeners, meetingRoomListener];
-
-        return () => {
-            allListeners.forEach(unsubscribe => unsubscribe());
-        };
-    }, [users, userProfile]);
-
-    return unreadCount;
-}
-// --- END: Unread Message Hooks ---
-
 
 const Notification: React.FC<{ message: string; type: 'success' | 'error'; onDismiss: () => void }> = ({ message, type, onDismiss }) => {
     useEffect(() => {
@@ -187,9 +37,11 @@ const LoginScreen: React.FC<{ setNotification: (n: any) => void; }> = ({ setNoti
         }
     }, []);
 
-    const performLogin = async () => {
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
         setIsLoading(true);
         setError('');
+
         try {
             if (!auth) {
                 throw new Error("Authentication services are unavailable.");
@@ -204,22 +56,13 @@ const LoginScreen: React.FC<{ setNotification: (n: any) => void; }> = ({ setNoti
             setIsLoading(false);
         }
     };
-
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        await performLogin();
-    };
-    
-    const handleFastLogin = async () => {
-        await performLogin();
-    };
     
     return (
         <div className="min-h-screen flex items-center justify-center login-screen p-4">
             <div className="w-full max-w-md bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl p-8 space-y-6">
                 <div className="text-center">
                     <img src="https://uxwing.com/wp-content/themes/uxwing/download/location-travel-map/globe-icon.png" alt="Usman Global Logo" className="h-20 w-20 mx-auto mb-4" />
-                    <h1 className="text-3xl font-bold text-slate-800">Usman Global Talha Division</h1>
+                    <h1 className="text-3xl font-bold text-slate-800">Usman Global</h1>
                     <p className="text-slate-600 mt-2">Stock & Accounting System</p>
                 </div>
                 <form onSubmit={handleLogin} className="space-y-4">
@@ -227,16 +70,6 @@ const LoginScreen: React.FC<{ setNotification: (n: any) => void; }> = ({ setNoti
                     <div><label className="block text-sm font-medium text-slate-700">Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="mt-1 w-full p-3 rounded-lg"/></div>
                     {error && <p className="text-red-500 text-sm">{error}</p>}
                     <button type="submit" disabled={isLoading} className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-blue-400 transition-colors">{isLoading ? 'Signing In...' : 'Sign In'}</button>
-                     <div className="text-center">
-                        <button
-                            type="button"
-                            onClick={handleFastLogin}
-                            disabled={isLoading}
-                            className="text-sm text-blue-600 hover:underline"
-                        >
-                            Fast Login (Dev)
-                        </button>
-                    </div>
                 </form>
                  <div className="text-center text-xs text-slate-500 pt-4 border-t">
                      <p className="mt-2 text-slate-400">Please use the credentials you have set up in your Firebase Authentication console.</p>
@@ -246,17 +79,13 @@ const LoginScreen: React.FC<{ setNotification: (n: any) => void; }> = ({ setNoti
     );
 };
 
-const mainModules: Module[] = ['dashboard', 'setup', 'dataEntry', 'accounting', 'reports', 'posting', 'logistics', 'hr', 'admin', 'chat'];
+const mainModules: Module[] = ['dashboard', 'setup', 'dataEntry', 'accounting', 'reports', 'posting', 'logistics', 'hr', 'admin'];
 
 const App: React.FC = () => {
     const [activeModule, setActiveModule] = useState<Module>('dashboard');
     const [activeSubView, setActiveSubView] = useState<string | null>(null);
     const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
     const { userProfile, authLoading, saveStatus } = useData();
-    const [unreadNotification, setUnreadNotification] = useState<string | null>(null);
-    const unreadSenderNames = useUnreadMessages(userProfile);
-    const unreadMessageCount = useUnreadMessageCount(userProfile);
-
 
     const [isNewItemModalOpen, setIsNewItemModalOpen] = useState<boolean>(false);
     const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
@@ -265,15 +94,6 @@ const App: React.FC = () => {
     const prevModuleRef = useRef<Module>();
     const [showEscapeConfirm, setShowEscapeConfirm] = useState(false);
     const escapeConfirmTimeoutRef = useRef<number | null>(null);
-
-     useEffect(() => {
-        if (unreadSenderNames.length > 0) {
-            const names = unreadSenderNames.join(', ');
-            setUnreadNotification(`You have unread messages from ${names}.`);
-        } else {
-            setUnreadNotification(null);
-        }
-    }, [unreadSenderNames]);
 
     useEffect(() => {
         if (prevModuleRef.current && prevModuleRef.current !== activeModule) {
@@ -291,8 +111,11 @@ const App: React.FC = () => {
     
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
+            // Because modals and the chatbot now handle their own Escape events and stop propagation,
+            // we no longer need to check if they are open here. This makes the logic much more robust.
             if (event.key === 'Escape') {
                 const target = event.target as HTMLElement;
+                // Still check if the user is typing in a form field.
                 if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
                     return;
                 }
@@ -308,7 +131,7 @@ const App: React.FC = () => {
                         }
                     }
                     setShowEscapeConfirm(false);
-                    if (escapeConfirmTimeoutRef.current !== null) {
+                    if (escapeConfirmTimeoutRef.current) {
                         clearTimeout(escapeConfirmTimeoutRef.current);
                     }
                     return;
@@ -317,23 +140,24 @@ const App: React.FC = () => {
                 if (navigationHistory.length > 0) {
                     event.preventDefault();
                     setShowEscapeConfirm(true);
-                    if (escapeConfirmTimeoutRef.current !== null) {
+                    if (escapeConfirmTimeoutRef.current) {
                         clearTimeout(escapeConfirmTimeoutRef.current);
                     }
                     escapeConfirmTimeoutRef.current = window.setTimeout(() => {
                         setShowEscapeConfirm(false);
                     }, 3000);
                 }
-                return; 
+                return; // Explicitly return after handling Escape
             }
             
+            // Alt + Key for Direct Navigation (only if not typing in a field)
             if (['INPUT', 'TEXTAREA', 'SELECT'].includes((event.target as HTMLElement).tagName)) {
                 return;
             }
 
             if (event.altKey) {
                 event.preventDefault();
-                switch (event.key.toLowerCase()) {
+                switch (event.key) {
                     case '1': handleNavigation('analytics'); break;
                     case '2': handleNavigation('dashboard'); break;
                     case '3': handleNavigation('setup'); break;
@@ -344,7 +168,6 @@ const App: React.FC = () => {
                     case '8': handleNavigation('logistics'); break;
                     case '9': handleNavigation('hr'); break;
                     case '0': handleNavigation('admin'); break;
-                    case 'c': handleNavigation('chat'); break;
                     
                     case 'o': handleNavigation('dataEntry', 'opening'); break;
                     case 'p': handleNavigation('dataEntry', 'production'); break;
@@ -360,7 +183,7 @@ const App: React.FC = () => {
         window.addEventListener('keydown', handleKeyDown);
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
-            if (escapeConfirmTimeoutRef.current !== null) {
+            if (escapeConfirmTimeoutRef.current) {
                 clearTimeout(escapeConfirmTimeoutRef.current);
             }
         };
@@ -379,16 +202,10 @@ const App: React.FC = () => {
             handleNavigation(firstModule);
         }
     }, [activeModule, userProfile]);
-    
-    const handleLogout = async () => {
+
+    const handleLogout = () => {
         if (auth) {
-            try {
-                // The Firebase v8 `signOut` method takes no arguments, but the types might be incorrect.
-                // Casting to `any` bypasses the TypeScript error.
-                await (auth as any).signOut();
-            } catch (error) {
-                console.error("Error signing out: ", error);
-            }
+            auth.signOut();
         }
     };
     
@@ -425,28 +242,13 @@ const App: React.FC = () => {
             case 'hr': return <HRModule userProfile={userProfile} initialView={activeSubView} />;
             case 'admin': return <AdminModule setNotification={setNotification} />;
             case 'test': return <TestPage />;
-            case 'chat': return <ChatModule />;
             default: return <Dashboard setModule={(m, s) => handleNavigation(m, s)} />;
         }
     };
 
-    const NavButton: React.FC<{ module: Module; label: string; shortcut: string; unreadCount?: number }> = ({ module, label, shortcut, unreadCount = 0 }) => {
+    const NavButton: React.FC<{ module: Module; label: string; shortcut: string }> = ({ module, label, shortcut }) => {
         if (!hasAccess(module)) return null;
-        return (
-            <button
-                onClick={() => handleNavigation(module)}
-                className={`relative px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeModule === module ? 'bg-white text-blue-600 shadow' : 'text-white hover:bg-blue-700'}`}
-                title={`Shortcut: ${shortcut}`}
-            >
-                {label}
-                {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                    </span>
-                )}
-            </button>
-        );
+        return (<button onClick={() => handleNavigation(module)} className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeModule === module ? 'bg-white text-blue-600 shadow' : 'text-white hover:bg-blue-700'}`} title={`Shortcut: ${shortcut}`}>{label}</button>);
     };
 
     if (authLoading) {
@@ -462,18 +264,6 @@ const App: React.FC = () => {
     return (
         <div className="min-h-screen bg-slate-100 no-print">
             {notification && <Notification message={notification.msg} type={notification.type} onDismiss={() => setNotification(null)} />}
-            {unreadNotification && (
-                <div className="fixed top-20 right-5 bg-blue-600 text-white py-3 px-5 rounded-lg shadow-lg z-50 flex items-center gap-4 animate-fade-in-out-short">
-                    <span>{unreadNotification}</span>
-                    <button
-                        onClick={() => { handleNavigation('chat'); setUnreadNotification(null); }}
-                        className="font-bold bg-white/20 hover:bg-white/40 px-3 py-1 rounded"
-                    >
-                        View
-                    </button>
-                    <button onClick={() => setUnreadNotification(null)} className="font-bold text-white/70 hover:text-white">✕</button>
-                </div>
-            )}
             <header className="bg-blue-600 text-white shadow-md sticky top-0 z-40 no-print">
                 <div className="container mx-auto px-4 py-3 flex justify-between items-center">
                     <div className="flex items-center space-x-3">
@@ -492,7 +282,6 @@ const App: React.FC = () => {
                             <NavButton module="logistics" label="Logistics" shortcut="Alt + 8" />
                             <NavButton module="hr" label="HR" shortcut="Alt + 9" />
                             <NavButton module="admin" label="Admin" shortcut="Alt + 0" />
-                            <NavButton module="chat" label="Chat" shortcut="Alt + C" unreadCount={unreadMessageCount} />
                         </nav>
                         <div className="flex items-center space-x-3 border-l border-blue-500 pl-4">
                             <div className="w-36 text-right">
@@ -551,7 +340,6 @@ const App: React.FC = () => {
                             <p><kbd className="px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg">Alt + 8</kbd> &rarr; Logistics</p>
                              <p><kbd className="px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg">Alt + 9</kbd> &rarr; HR</p>
                              <p><kbd className="px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg">Alt + 0</kbd> &rarr; Admin</p>
-                             <p><kbd className="px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg">Alt + C</kbd> &rarr; Chat</p>
                              <p><kbd className="px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg">Escape</kbd> &rarr; Go Back (with confirmation)</p>
                         </div>
                     </div>

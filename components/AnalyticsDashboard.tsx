@@ -12,9 +12,7 @@ const AnalyticsDashboard: React.FC = () => {
         }
         const intervalId = setInterval(() => {
             if ((window as any).Recharts?.ResponsiveContainer) {
-                // FIX: The dispatch function from useReducer expects an argument, even if the reducer doesn't use it.
-                // This is a common pattern to force a re-render. Passing null satisfies the type checker.
-                forceUpdate(null);
+                forceUpdate();
                 clearInterval(intervalId);
             }
         }, 100);

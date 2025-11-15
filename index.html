@@ -4,15 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="https://uxwing.com/wp-content/themes/uxwing/download/location-travel-map/globe-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>UGM-CRM</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- jsPDF and html2canvas for PDF generation -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <!-- Firebase SDKs (removed defer to prevent race conditions) -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <title>Stock Management System</title>
     <style>
       @media print {
         body * {
@@ -104,13 +96,13 @@
           animation: fade-in-out-short 3s ease-in-out forwards;
       }
       /* Global Form Element Styles */
-      main input[type="text"],
-      main input[type="number"],
-      main input[type="date"],
-      main input[type="email"],
-      main input[type="password"],
-      main select,
-      main textarea {
+      input[type="text"],
+      input[type="number"],
+      input[type="date"],
+      input[type="email"],
+      input[type="password"],
+      select,
+      textarea {
         background-color: #111827 !important; /* bg-gray-900 */
         color: #f9fafb !important; /* text-gray-50 */
         border: 1px solid #4b5563 !important; /* border-gray-600 */
@@ -118,9 +110,9 @@
       }
       
       /* Focus State */
-      main input:focus,
-      main select:focus,
-      main textarea:focus {
+      input:focus,
+      select:focus,
+      textarea:focus {
         outline: 2px solid transparent;
         outline-offset: 2px;
         border-color: #3b82f6 !important; /* focus:border-blue-500 */
@@ -128,9 +120,9 @@
       }
       
       /* Disabled State */
-      main input:disabled,
-      main select:disabled,
-      main textarea:disabled {
+      input:disabled,
+      select:disabled,
+      textarea:disabled {
         background-color: #374151 !important; /* bg-gray-700 */
         color: #9ca3af !important; /* text-gray-400 */
         cursor: not-allowed;
@@ -138,13 +130,13 @@
       }
 
       /* Placeholder Text Color */
-      main ::placeholder {
+      ::placeholder {
         color: #6b7280 !important; /* text-gray-500 */
         opacity: 1; /* Firefox */
       }
       
       /* Make select dropdown arrow visible on dark background */
-      main select {
+      select {
         background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
         background-position: right 0.5rem center;
         background-repeat: no-repeat;
@@ -155,20 +147,33 @@
         appearance: none;
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.1.1",
-    "react/": "https://aistudiocdn.com/react@^19.1.1/",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0",
-    "recharts": "https://aistudiocdn.com/recharts@^2.12.7"
-  }
-}
-</script>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://aistudiocdn.com/react@^19.1.1",
+          "react/": "https://aistudiocdn.com/react@^19.1.1/",
+          "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+          "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0",
+          "recharts": "https://aistudiocdn.com/recharts@^2.12.7"
+        }
+      }
+    </script>
+  <link rel="stylesheet" href="/index.css">
 </head>
   <body class="bg-slate-50">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+    
+    <!-- Moved scripts for better loading performance and to avoid race conditions -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Main app script, now guaranteed to run after all dependencies are loaded -->
+    <script type="text/babel" data-presets="react,typescript" data-type="module" src="./index.tsx"></script>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>

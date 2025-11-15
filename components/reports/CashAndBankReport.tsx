@@ -5,10 +5,9 @@ import ReportToolbar from './ReportToolbar.tsx';
 
 interface CashAndBankReportProps {
     mode: 'combined' | 'cash' | 'bank';
-    initialFilters?: any;
 }
 
-const CashAndBankReport: React.FC<CashAndBankReportProps> = ({ mode, initialFilters }) => {
+const CashAndBankReport: React.FC<CashAndBankReportProps> = ({ mode }) => {
     const { state } = useData();
     const today = new Date().toISOString().split('T')[0];
     const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
@@ -43,47 +42,24 @@ const CashAndBankReport: React.FC<CashAndBankReportProps> = ({ mode, initialFilt
     });
 
     useEffect(() => {
-        if (initialFilters) {
-            // Special handling for navigating to "Cash" or "Bank" from Balance Sheet
-            if (initialFilters.endDate) {
-                if(mode === 'cash') {
-                    setFilters({
-                        startDate: '2024-01-01',
-                        endDate: initialFilters.endDate,
-                        selectedAccounts: state.cashAccounts.map(a => a.id),
-                        selectedBankId: '',
-                    });
-                } else if (mode === 'bank') {
-                     setFilters({
-                        startDate: '2024-01-01',
-                        endDate: initialFilters.endDate,
-                        selectedAccounts: [],
-                        selectedBankId: '', // Will show all banks
-                    });
-                } else {
-                    setFilters(prev => ({ ...prev, ...initialFilters }));
-                }
-            } else {
-                 setFilters(prev => ({ ...prev, ...initialFilters }));
-            }
-            return; // Exit early
-        }
-
-        // Default filter logic when no initialFilters are provided
         if (mode !== 'bank') {
             setFilters(prev => ({
                 ...prev,
+                startDate: firstDayOfMonth,
+                endDate: today,
                 selectedAccounts: accountsForSelection.map(acc => acc.id),
                 selectedBankId: '',
             }));
         } else {
              setFilters(prev => ({
                 ...prev,
+                startDate: firstDayOfMonth,
+                endDate: today,
                 selectedAccounts: [],
                 selectedBankId: '',
             }));
         }
-    }, [mode, accountsForSelection, initialFilters, state.cashAccounts]);
+    }, [mode, accountsForSelection]);
 
 
     const handleFilterChange = (filterName: string, value: any) => {

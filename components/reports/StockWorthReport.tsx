@@ -1,15 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext.tsx';
 import ReportFilters from './ReportFilters.tsx';
 import ReportToolbar from './ReportToolbar.tsx';
 import { InvoiceStatus, PackingType } from '../../types.ts';
 import ItemSelector from '../ui/ItemSelector.tsx';
 
-interface StockWorthReportProps {
-    initialFilters?: any;
-}
-
-const StockWorthReport: React.FC<StockWorthReportProps> = ({ initialFilters }) => {
+const StockWorthReport: React.FC = () => {
     const { state } = useData();
     const today = new Date().toISOString().split('T')[0];
     
@@ -20,12 +16,6 @@ const StockWorthReport: React.FC<StockWorthReportProps> = ({ initialFilters }) =
         sectionId: '',
         itemId: '',
     });
-
-    useEffect(() => {
-        if (initialFilters) {
-            setFilters(prev => ({ ...prev, ...initialFilters }));
-        }
-    }, [initialFilters]);
 
     const handleFilterChange = (filterName: string, value: any) => {
         setFilters(prev => {

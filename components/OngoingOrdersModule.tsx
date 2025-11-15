@@ -5,21 +5,6 @@ import { OngoingOrderItem, OngoingOrder, OngoingOrderStatus, PackingType, Module
 import Modal from './ui/Modal.tsx';
 import ItemSelector from './ui/ItemSelector.tsx';
 import CurrencyInput from './ui/CurrencyInput.tsx';
-import EntitySelector from './ui/EntitySelector.tsx';
-
-// FIX: Added a Notification component to handle its own timeout via useEffect, preventing memory leaks.
-const Notification: React.FC<{ message: string; onTimeout: () => void }> = ({ message, onTimeout }) => {
-    useEffect(() => {
-        const timer = setTimeout(onTimeout, 3000);
-        return () => clearTimeout(timer);
-    }, [onTimeout]);
-
-    return (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg z-50 animate-fade-in-out">
-            {message}
-        </div>
-    );
-};
 
 interface OngoingOrdersProps {
     setModule: (module: Module) => void;
@@ -34,6 +19,7 @@ const OngoingOrdersModule: React.FC<OngoingOrdersProps> = ({ userProfile }) => {
 
     const showNotification = (message: string) => {
         setNotification(message);
+        setTimeout(() => setNotification(null), 3000);
     };
 
     const handleOrderShipped = () => {
@@ -44,7 +30,7 @@ const OngoingOrdersModule: React.FC<OngoingOrdersProps> = ({ userProfile }) => {
 
     return (
         <div className="space-y-6">
-            {notification && <Notification message={notification} onTimeout={() => setNotification(null)} />}
+            {notification && <div className="fixed top-5 left-1/2 -translate-x-1/2 bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg z-50">{notification}</div>}
             
             <div className="bg-white p-4 rounded-lg shadow-md flex items-center space-x-2">
                 <h2 className="text-xl font-bold text-slate-700 mr-4">Ongoing Orders</h2>
@@ -143,17 +129,7 @@ const NewOrderForm: React.FC<{ showNotification: (msg: string) => void, onSaveSu
         <div className="space-y-6">
              <h2 className="text-2xl font-bold text-slate-700">Book New Order</h2>
              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                    <label className="block text-sm font-medium text-slate-700">Customer</label>
-                    <EntitySelector
-                        entities={state.customers}
-                        selectedEntityId={customerId}
-                        onSelect={setCustomerId}
-                        placeholder="Search Customers..."
-                        disabled={!!orderId}
-                        inputRef={customerRef as any}
-                    />
-                </div>
+                <div><label className="block text-sm font-medium text-slate-700">Customer</label><select ref={customerRef} value={customerId} onChange={e => setCustomerId(e.target.value)} disabled={!!orderId} className="mt-1 w-full p-2 border border-slate-300 rounded-md disabled:bg-slate-200"><option value="">Select Customer</option>{state.customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                 <div><label className="block text-sm font-medium text-slate-700">Order ID</label><input type="text" value={orderId} readOnly className="mt-1 w-full p-2 border border-slate-300 rounded-md bg-slate-200"/></div>
                 <div><label className="block text-sm font-medium text-slate-700">Date</label><input type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)} disabled={!orderId} min={minDate} className="mt-1 w-full p-2 border border-slate-300 rounded-md disabled:bg-slate-200"/></div>
             </div>

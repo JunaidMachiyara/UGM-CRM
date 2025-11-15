@@ -123,7 +123,6 @@ If the user asks to go to a page, use the 'navigateTo' function.
   - "I want to create a new voucher" -> navigateTo(module: 'accounting', subView: 'new')
   - "Open the HR tasks" -> navigateTo(module: 'hr', subView: 'tasks')
   - "Go to sales" -> navigateTo(module: 'dataEntry', subView: 'sales')
-  - "Open expense planner" -> navigateTo(module: 'reports', subView: 'financial/expense-planner')
   - "Open payment planner" -> navigateTo(module: 'reports', subView: 'financial/payment-planner')
 
 ROLE 2: DATA RETRIEVAL & Q&A
@@ -187,8 +186,7 @@ export async function handler(event: { httpMethod: string; body: string | null }
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
         const response = await ai.models.generateContent({
-            // FIX: Updated to a more powerful model suitable for function calling.
-            model: 'gemini-2.5-pro',
+            model: 'gemini-2.5-flash',
             contents,
             config: {
                 systemInstruction,

@@ -22,10 +22,9 @@ import FeasibilityReport from "./reports/FeasibilityReport.tsx";
 import RebalingReport from "./reports/RebalingReport.tsx";
 import PaymentPlannerReport from './reports/PaymentPlannerReport.tsx';
 import StockWorthReport from './reports/StockWorthReport.tsx';
-import ExpensePlannerReport from './reports/ExpensePlannerReport.tsx';
 
 type ReportCategoryKey = 'item-performance' | 'original-stock-v1' | 'ledger' | 'cash-bank' | 'invoices' | 'detailed-reports' | 'production' | 'financial' | 'fulfillment';
-export type ReportKey = 
+type ReportKey = 
     | 'item-performance/summary'
     | 'item-performance/stock-worth'
     | 'item-performance/non-moving'
@@ -49,7 +48,6 @@ export type ReportKey =
     | 'financial/balance-sheet'
     | 'financial/profit-loss'
     | 'financial/payment-planner'
-    | 'financial/expense-planner'
     | 'fulfillment/dashboard';
 
 
@@ -135,19 +133,12 @@ export const reportStructure: ReportCategory[] = [
             { key: 'financial/balance-sheet', label: 'Balance Sheet' },
             { key: 'financial/profit-loss', label: 'Profit & Loss Report' },
             { key: 'financial/payment-planner', label: 'Receipts & Payments Planner' },
-            { key: 'financial/expense-planner', label: 'Expense Paid & Payable Planner' },
         ],
     },
 ];
 
 const ReportsModule: React.FC<{ userProfile: UserProfile | null, initialReport?: string | null }> = ({ userProfile, initialReport }) => {
     const [activeReportKey, setActiveReportKey] = useState<ReportKey | null>(null);
-    const [initialFilters, setInitialFilters] = useState<any>(null);
-
-    const navigateToReport = (key: ReportKey, filters: any = null) => {
-        setActiveReportKey(key);
-        setInitialFilters(filters);
-    };
 
     const accessibleReportStructure = useMemo((): ReportCategory[] => {
         if (!userProfile) return [];
@@ -191,7 +182,7 @@ const ReportsModule: React.FC<{ userProfile: UserProfile | null, initialReport?:
                     : `${cat.key}/main` === initialReport
             );
             if (isAccessible) {
-                navigateToReport(initialReport as ReportKey);
+                setActiveReportKey(initialReport as ReportKey);
                 return;
             }
         }
@@ -213,10 +204,10 @@ const ReportsModule: React.FC<{ userProfile: UserProfile | null, initialReport?:
             const firstReportKey = firstAccessibleCategory.subReports
                 ? firstAccessibleCategory.subReports[0].key
                 : `${firstAccessibleCategory.key}/main` as ReportKey;
-            navigateToReport(firstReportKey);
+            setActiveReportKey(firstReportKey);
         } else {
             // 4. If no reports are accessible at all
-            navigateToReport(null as any);
+            setActiveReportKey(null);
         }
 
     }, [accessibleReportStructure, initialReport]);
@@ -225,10 +216,10 @@ const ReportsModule: React.FC<{ userProfile: UserProfile | null, initialReport?:
     const handleSelectCategory = (category: ReportCategory) => {
         if (category.subReports && category.subReports.length > 0) {
             if (!activeReportKey || !activeReportKey.startsWith(category.key)) {
-                navigateToReport(category.subReports[0].key);
+                setActiveReportKey(category.subReports[0].key);
             }
         } else {
-            navigateToReport(`${category.key}/main` as ReportKey);
+            setActiveReportKey(`${category.key}/main` as ReportKey);
         }
     };
     
@@ -239,7 +230,7 @@ const ReportsModule: React.FC<{ userProfile: UserProfile | null, initialReport?:
             case 'item-performance/summary':
                 return <ItemPerformanceReport />;
             case 'item-performance/stock-worth':
-                return <StockWorthReport initialFilters={initialFilters} />;
+                return <StockWorthReport />;
             case 'item-performance/item-summary':
                 return <ItemSummaryReport />;
             case 'item-performance/non-moving':
@@ -253,13 +244,13 @@ const ReportsModule: React.FC<{ userProfile: UserProfile | null, initialReport?:
             case 'fulfillment/dashboard':
                 return <OrderFulfillmentDashboard />;
             case 'ledger/main':
-                return <LedgerReport initialFilters={initialFilters} />;
+                return <LedgerReport />;
             case 'cash-bank/ledger':
-                return <CashAndBankReport mode="combined" initialFilters={initialFilters} />;
+                return <CashAndBankReport mode="combined" />;
             case 'cash-bank/cash-book':
-                return <CashAndBankReport mode="cash" initialFilters={initialFilters} />;
+                return <CashAndBankReport mode="cash" />;
             case 'cash-bank/bank-book':
-                return <CashAndBankReport mode="bank" initialFilters={initialFilters} />;
+                return <CashAndBankReport mode="bank" />;
             case 'invoices/sales':
                 return <SalesInvoiceReport />;
             case 'invoices/purchase':
@@ -275,13 +266,11 @@ const ReportsModule: React.FC<{ userProfile: UserProfile | null, initialReport?:
             case 'production/rebaling-report':
                 return <RebalingReport />;
             case 'financial/balance-sheet':
-                return <BalanceSheet onNavigate={navigateToReport} />;
+                return <BalanceSheet />;
             case 'financial/profit-loss':
-                return <ProfitAndLossReport initialFilters={initialFilters} />;
+                return <ProfitAndLossReport />;
             case 'financial/payment-planner':
                 return <PaymentPlannerReport />;
-            case 'financial/expense-planner':
-                return <ExpensePlannerReport />;
             case 'production/section-production':
                 return <SectionProductionReport />;
             case 'production/feasibility':
@@ -323,7 +312,7 @@ const ReportsModule: React.FC<{ userProfile: UserProfile | null, initialReport?:
                              return (
                                 <button
                                     key={report.key}
-                                    onClick={() => navigateToReport(report.key)}
+                                    onClick={() => setActiveReportKey(report.key)}
                                     className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
                                         isActive
                                             ? 'bg-blue-100 text-blue-800 font-semibold ring-1 ring-blue-300'
